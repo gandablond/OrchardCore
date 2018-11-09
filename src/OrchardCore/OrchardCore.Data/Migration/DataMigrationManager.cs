@@ -87,7 +87,7 @@ namespace OrchardCore.Data.Migration
         {
             if (_logger.IsEnabled(LogLevel.Information))
             {
-                _logger.LogInformation("Uninstalling feature: {0}.", feature);
+                _logger.LogInformation("Uninstalling feature '{FeatureName}'.", feature);
             }
             var migrations = GetDataMigrations(feature);
 
@@ -137,7 +137,7 @@ namespace OrchardCore.Data.Migration
 
             if (_logger.IsEnabled(LogLevel.Information))
             {
-                _logger.LogInformation("Updating feature: {0}", featureId);
+                _logger.LogInformation("Updating feature '{FeatureName}'", featureId);
             }
 
             // proceed with dependent features first, whatever the module it's in
@@ -161,7 +161,7 @@ namespace OrchardCore.Data.Migration
                 var tempMigration = migration;
 
                 // get current version for this migration
-                var dataMigrationRecord = GetDataMigrationRecordAsync(tempMigration).Result;
+                var dataMigrationRecord = await GetDataMigrationRecordAsync(tempMigration);
 
                 var current = 0;
                 if (dataMigrationRecord != null)
@@ -192,23 +192,12 @@ namespace OrchardCore.Data.Migration
 
                     while (lookupTable.ContainsKey(current))
                     {
-                        try
+                        if (_logger.IsEnabled(LogLevel.Information))
                         {
-                            if (_logger.IsEnabled(LogLevel.Information))
-                            {
-                                _logger.LogInformation("Applying migration for {0} from version {1}.", featureId, current);
-                            }
-                            current = (int)lookupTable[current].Invoke(migration, new object[0]);
+                            _logger.LogInformation("Applying migration for '{FeatureName}' from version {Version}.", featureId, current);
                         }
-                        catch (Exception ex)
-                        {
-                            if (ex.IsFatal())
-                            {
-                                throw;
-                            }
-                            _logger.LogError(0, "An unexpected error occurred while applying migration on {0} from version {1}.", featureId, current);
-                            throw;
-                        }
+
+                        current = (int)lookupTable[current].Invoke(migration, new object[0]);
                     }
 
                     // if current is 0, it means no upgrade/create method was found or succeeded
@@ -221,13 +210,9 @@ namespace OrchardCore.Data.Migration
                 }
                 catch (Exception ex)
                 {
-                    if (ex.IsFatal())
-                    {
-                        throw;
-                    }
-                    _logger.LogError(0, "Error while running migration version {0} for {1}.", current, featureId);
+                    _logger.LogError(ex, "Error while running migration version {Version} for '{FeatureName}'.", current, featureId);
+
                     _session.Cancel();
-                    throw new Exception(T["Error while running migration version {0} for {1}.", current, featureId], ex);
                 }
                 finally
                 {
@@ -337,7 +322,7 @@ namespace OrchardCore.Data.Migration
                         throw;
                     }
 
-                    _logger.LogError("Could not run migrations automatically on " + featureId, ex);
+                    _logger.LogError(ex, "Could not run migrations automatically on '{FeatureName}'", featureId);
                 }
             }
         }
